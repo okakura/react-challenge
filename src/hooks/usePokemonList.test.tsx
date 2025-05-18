@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 
 import usePokemonList from './usePokemonList';
+import Wrapper from '../test/testWrapper';
 
 const PokemonListTestComponent = () => {
   const {
@@ -46,60 +47,53 @@ const PokemonListTestComponent = () => {
 
 describe('usePokemonList Tests', () => {
   it('fetches and displays first page of Pokémon', async () => {
-    render(<PokemonListTestComponent />);
+    render(<PokemonListTestComponent />, { wrapper: Wrapper });
 
-    // Wait for pokemon-1 to appear
-    const firstPokemon = await screen.findByText((content) =>
-      content.includes('pokemon-1')
-    );
-    expect(firstPokemon).toBeInTheDocument();
-
-    // Also check another pokemon on the page
-    expect(await screen.findByText('pokemon-5')).toBeInTheDocument();
-
+    expect(await screen.findByText('pokemon-1')).toBeInTheDocument();
+    expect(screen.getByText('pokemon-5')).toBeInTheDocument();
     expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
   });
 
   it('navigates to next page correctly', async () => {
-    render(<PokemonListTestComponent />);
+    render(<PokemonListTestComponent />, { wrapper: Wrapper });
 
     await screen.findByText('pokemon-1');
     fireEvent.click(screen.getByText('Next'));
 
-    await screen.findByText('pokemon-6');
+    expect(await screen.findByText('pokemon-6')).toBeInTheDocument();
     expect(screen.getByText('pokemon-10')).toBeInTheDocument();
     expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
   });
 
   it('navigates to previous page correctly', async () => {
-    render(<PokemonListTestComponent />);
+    render(<PokemonListTestComponent />, { wrapper: Wrapper });
 
     await screen.findByText('pokemon-1');
     fireEvent.click(screen.getByText('Go to page 2'));
 
-    await screen.findByText('pokemon-6');
+    expect(await screen.findByText('pokemon-6')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Previous'));
 
-    await screen.findByText('pokemon-1');
+    expect(await screen.findByText('pokemon-1')).toBeInTheDocument();
     expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
   });
 
   it('disables next button on last page', async () => {
-    render(<PokemonListTestComponent />);
+    render(<PokemonListTestComponent />, { wrapper: Wrapper });
 
     await screen.findByText('pokemon-1');
     fireEvent.click(screen.getByText('Go to page 2'));
     await screen.findByText('pokemon-6');
 
     fireEvent.click(screen.getByText('Next'));
-    await screen.findByText('pokemon-11');
+    expect(await screen.findByText('pokemon-11')).toBeInTheDocument();
 
     const nextButton = screen.getByText('Next');
     expect(nextButton).toBeDisabled();
   });
 
   it('disables previous button on first page', async () => {
-    render(<PokemonListTestComponent />);
+    render(<PokemonListTestComponent />, { wrapper: Wrapper });
 
     await screen.findByText('pokemon-1');
     const prevButton = screen.getByText('Previous');

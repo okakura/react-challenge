@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 interface PokemonDetail {
   id: number;
@@ -12,44 +12,35 @@ interface PokemonDetail {
 }
 
 interface UsePokemonDetailResult {
-  pokemon: PokemonDetail | null;
+  pokemon: PokemonDetail | undefined;
   loading: boolean;
   error: string | null;
 }
 
+const fetchPokemonDetail = async (
+  pokemonNameOrId: string | number
+): Promise<PokemonDetail> => {
+  const res = await fetch(
+    `https://pokeapi.co/api/v2/pokemon/${pokemonNameOrId}`
+  );
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+  return res.json();
+};
+
 export default function usePokemonDetail(
   pokemonNameOrId: string | number
 ): UsePokemonDetailResult {
-  const [pokemon, setPokemon] = useState<PokemonDetail | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['pokemonDetail', pokemonNameOrId],
+    queryFn: () => fetchPokemonDetail(pokemonNameOrId),
+    enabled: !!pokemonNameOrId
+  });
 
-  useEffect(() => {
-    if (!pokemonNameOrId) return;
-
-    const fetchPokemonDetail = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetch(
-          `https://pokeapi.co/api/v2/pokemon/${pokemonNameOrId}`
-        );
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
-        }
-        const data = await response.json();
-        setPokemon(data);
-      } catch (err: any) {
-        setError(err.message || 'Something went wrong');
-        setPokemon(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPokemonDetail();
-  }, [pokemonNameOrId]);
-
-  return { pokemon, loading, error };
+  return {
+    pokemon: data,
+    loading: isLoading,
+    error: isError ? (error as Error).message : null
+  };
 }

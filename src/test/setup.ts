@@ -1,4 +1,4 @@
-// test/setup.ts
+import { afterAll, afterEach, beforeAll } from 'vitest';
 import { server } from './server';
 import '@testing-library/jest-dom';
 

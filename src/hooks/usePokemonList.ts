@@ -1,12 +1,16 @@
-// hooks/usePokemonList.ts
-
-import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 const PAGE_SIZE = 5;
 
 interface PokemonListResult {
   name: string;
   url: string;
+}
+
+interface PokemonApiResponse {
+  count: number;
+  results: PokemonListResult[];
 }
 
 interface UsePokemonListResult {
@@ -20,59 +24,62 @@ interface UsePokemonListResult {
   prevPage: () => void;
 }
 
-export default (): UsePokemonListResult => {
-  const [pokemon, setPokemon] = useState<PokemonListResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const fetchPokemon = async (page: number): Promise<PokemonApiResponse> => {
+  const offset = (page - 1) * PAGE_SIZE;
+  const res = await fetch(
+    `https://pokeapi.co/api/v2/pokemon?offset=${offset}&limit=${PAGE_SIZE}`
+  );
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+};
 
+export default function usePokemonList(): UsePokemonListResult {
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
+  const queryClient = useQueryClient();
 
-  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['pokemon', currentPage],
+    queryFn: () => fetchPokemon(currentPage),
+    placeholderData: (prevData) => prevData
+  });
 
   useEffect(() => {
-    const fetchPokemon = async () => {
-      setLoading(true);
-      setError(null);
+    if (currentPage < (data?.count ?? 0) / PAGE_SIZE) {
+      queryClient.prefetchQuery({
+        queryKey: ['pokemon', currentPage + 1],
+        queryFn: () => fetchPokemon(currentPage + 1)
+      });
+    }
+  }, [currentPage, data?.count, queryClient]);
 
-      try {
-        const offset = (currentPage - 1) * PAGE_SIZE;
-        const response = await fetch(
-          `https://pokeapi.co/api/v2/pokemon?offset=${offset}&limit=${PAGE_SIZE}`
-        );
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
-        }
+  const totalPages = useMemo(() => {
+    return data ? Math.ceil(data.count / PAGE_SIZE) : 0;
+  }, [data]);
 
-        const data = await response.json();
-        setPokemon(data.results);
-        setTotalCount(data.count);
-      } catch (err: any) {
-        setError(err.message || 'Something went wrong');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const goToPage = useCallback(
+    (page: number) => {
+      if (page < 1 || (data && page > totalPages)) return;
+      setCurrentPage(page);
+    },
+    [totalPages, data]
+  );
 
-    fetchPokemon();
-  }, [currentPage]);
+  const nextPage = useCallback(() => {
+    goToPage(currentPage + 1);
+  }, [currentPage, goToPage]);
 
-  const goToPage = (page: number) => {
-    if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
-  };
-
-  const nextPage = () => goToPage(currentPage + 1);
-  const prevPage = () => goToPage(currentPage - 1);
+  const prevPage = useCallback(() => {
+    goToPage(currentPage - 1);
+  }, [currentPage, goToPage]);
 
   return {
-    pokemon,
-    loading,
-    error,
+    pokemon: data?.results ?? [],
+    loading: isLoading,
+    error: isError ? (error as Error).message : null,
     currentPage,
     totalPages,
     goToPage,
     nextPage,
     prevPage
   };
-};
+}
